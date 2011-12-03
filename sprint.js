@@ -168,6 +168,8 @@
 		} else {
 			delete window.Sprint;
 		}
+		
+		return Sprint;
 	};
 	
 	// Finally, assign `Sprint` to `window` for public access:
