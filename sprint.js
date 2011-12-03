@@ -16,6 +16,7 @@
 	var simpleClassSelector = /^(\.([a-zA-Z_]|\\.)([a-zA-Z0-9_-]|\\.)*)*$/;
 	
 	var escapedCharacter = /\\(.)/g;
+	var quotes = /(?=['"])/g;
 	
 	// Check if comments are included in `getElementsByTagName('*')` and `children`: (this happens in IE8 and under)
 	var elementsRequireFiltering = (function() {
@@ -84,6 +85,10 @@
 	 */
 	function stripSlashes(str) {
 		return str.replace(escapedCharacter, second);
+	}
+	
+	function escapeQuotes(str) {
+		return str.replace(quotes, '\\');
 	}
 	
 	/**
@@ -157,13 +162,14 @@
 		// Order: [tagSelector]{[idSelector][classSelector]*}[attributeSelector]*[pseudoClassSelector]*
 		var i, j, type;
 		var tag, id;
+		var fText = [];
 		
-		i = selector.search(/[a-zA-Z0-9_-]/); // TODO: Enforce tag limitations?
+		i = selector.search(/[^a-zA-Z0-9_-]/); // TODO: Enforce tag limitations?
 		tag = selector.substr(0, i); // i will not be -1 because if we got here, the selector shouldn't be empty
-		type = i.charAt(i);
+		type = selector.charAt(i);
 		
 		if(type === '#') {
-			j = selector.substr(i + 1).search();
+			j = selector.substr(i + 1).search(/[^a-zA-Z0-9_-]/); // TODO: Escaping?
 			
 			if(~j) {
 				// Something else there:
@@ -173,6 +179,16 @@
 				id = selector.substr(i + 1);
 			}
 		}
+		
+		if(tag) {
+			fText.push('el.tagName.toLowerCase()===\'' + escapeQuotes(tag.toLowerCase()) + '\'');
+		}
+		
+		if(id) {
+			fText.push('el.id===\'' + escapeQuotes(id) + '\'');
+		}
+		
+		return new Function(['el'], 'return ' + fText.join('&&') + ';');
 	}
 
 	/**
@@ -233,8 +249,8 @@
 		
 		if(context.querySelectorAll) {
 			try {
-				// DEBUG:
-				throw new Error();
+				//// DEBUG:
+				//throw new Error();
 			
 				return toArray(context.querySelectorAll(selector));
 			} catch(ex) {
