@@ -85,6 +85,95 @@
 	function stripSlashes(str) {
 		return str.replace(escapedCharacter, second);
 	}
+	
+	/**
+	 * Tokenizes the specified selector into an array of tokens.
+	 * Not currently used because order is enforced.
+	 *\/
+	var singleTokens = '()+~>,';
+		
+	function tokenizeSelector(selector) {
+		var tokens = [];
+		var addWhitespace = false;
+		var shouldAddWhitespace = false;
+		var isEscaped = false;
+		var isSingleQuoted = false;
+		var currentToken = '';
+		var i = 0, c;
+		
+		function pushToken() {
+			if(currentToken) {
+				tokens.push(currentToken);
+				currentToken = '';
+			}
+		}
+		
+		loop: for(; c = selector.charAt(i); i++) {
+			if(isEscaped) {
+				// The character is escaped, so we'll add it regardless.
+				isEscaped = false;
+			} else if(~singleTokens.indexOf(c)) {
+				// The whitespace is meaningless.
+				addWhitespace = false;
+				shouldAddWhitespace = false;
+				
+				// Add the last token, *and* add this as a separate token:
+				pushToken();
+				tokens.push(c);
+				
+				// Also, we don't add this character, since it was already added:
+				continue loop;
+			} else if(c === ' ' || c === '\t') {
+				// It's whitespace; could be meaningless, but might not be.
+				// Set our whitespace flag variable, if we're allowed:
+				if(shouldAddWhitespace) {
+					addWhitespace = true;
+				}
+				
+				// Also, we'll add the last token:
+				pushToken();
+			} else {
+				// Whitespace *will* matter now, and if whitespace exists, it matters.
+				shouldAddWhitespace = true;
+				if(addWhitespace) {
+					tokens.push(' ');
+					addWhitespace = false;
+				}
+			}
+			
+			// Finally, add the current character to the current token:
+			currentToken += c;
+		}
+		
+		// If there's still a token, we add it. Any whitespace here is also ignored.
+		pushToken();
+		
+		return tokens;
+	}
+	
+	window.tokenize = tokenizeSelector;*/
+	
+	function compileSelector(selector) {
+		// Order: [tagSelector]{[idSelector][classSelector]*}[attributeSelector]*[pseudoClassSelector]*
+		var i, j, type;
+		var tag, id;
+		
+		i = selector.search(/[a-zA-Z0-9_-]/); // TODO: Enforce tag limitations?
+		tag = selector.substr(0, i); // i will not be -1 because if we got here, the selector shouldn't be empty
+		type = i.charAt(i);
+		
+		if(type === '#') {
+			j = selector.substr(i + 1).search();
+			
+			if(~j) {
+				// Something else there:
+				id = selector.substr(i + 1, j);
+			} else {
+				// The rest of it is ID:
+				id = selector.substr(i + 1);
+			}
+		}
+	}
 
 	/**
 	 * Finds all elements within `context` matching the selector `selector` and returns them as an array.
@@ -135,7 +224,7 @@
 		}
 		
 		if(simpleIdSelector.test(selector)) {
-			return wrapOrEmpty(document.getElementById(stripSlashes(selector.substring(1))));
+			return wrapOrEmpty(document.getElementById(stripSlashes(selector.substr(1))));
 		}
 		
 		if(context.getElementsByClassName && simpleClassSelector.test(selector)) {
@@ -144,11 +233,18 @@
 		
 		if(context.querySelectorAll) {
 			try {
+				// DEBUG:
+				throw new Error();
+			
 				return toArray(context.querySelectorAll(selector));
 			} catch(ex) {
 				// Ignore it and move on.
 			}
 		}
+		
+		// If we got here, there are no optimizations. Compile the selector and go:
+		// TODO:
+		return filter(context.getElementsByTagName('*'), compileSelector(selector));
 	}
 	
 	// Get ready for no-conflict mode:
